@@ -16,23 +16,30 @@ class GasDetector(object):
     TCP interface.
     """
 
-    def __init__(self, address):
+    def __init__(self, address, timeout=0.5):
         """Save the IP address of the device."""
         if not address.startswith('http://'):
             address = 'http://' + address
         if not address.endswith('/'):
             address += '/'
         self.address = address
+        self.session = None
+        self.timeout = timeout
 
     async def __aenter__(self):
         """Support `async with` by entering a client session."""
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(read_timeout=self.timeout)
         return self
 
     async def __aexit__(self, *err):
         """Support `async with` by exiting a client session."""
-        await self.session.close()
-        self.session = None
+        await self.close()
+
+    async def close(self):
+        """Close the underlying session, if it exists."""
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
 
     async def get(self, raw=False):
         """Get current state from the SPM Flex gas detector.
@@ -43,7 +50,7 @@ class GasDetector(object):
             Dictionary of sensor variables
         """
         if self.session is None:
-            self.session = aiohttp.ClientSession()
+            self.session = aiohttp.ClientSession(read_timeout=self.timeout)
         endpoint = self.address + 'dyn/ContinuingStatus'
         async with self.session.get(endpoint) as response:
             if response.status > 200:
@@ -60,8 +67,8 @@ class GasDetector(object):
             'flow': int(status['Flow'].rstrip('cc/min')),
             'gas': status['GasName'],
             'id': status['UnitID'].lstrip('Unit ID: '),
-            'low-alarm threshold': status['Alarm1Setpoint'],
-            'high-alarm threshold': status['Alarm2Setpoint'],
+            'low-alarm threshold': float(status['Alarm1Setpoint']),
+            'high-alarm threshold': float(status['Alarm2Setpoint']),
             'temperature': int(status['AmbientTemp'].rstrip('C')),
             'life': float(status['CCDaysRemaining'].split(' ')[-1]),
             'fault': 'Fault' if status['FaultDetails'] else 'No fault'

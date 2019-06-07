@@ -6,7 +6,7 @@ with open('README.md', 'r') as in_file:
 
 setup(
     name="spmflex",
-    version="0.1.0",
+    version="0.1.1",
     description="Python driver for Honeywell SPM Flex gas dectectors.",
     long_description=long_description,
     long_description_content_type='text/markdown',
